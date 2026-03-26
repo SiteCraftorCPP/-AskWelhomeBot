@@ -1,0 +1,28 @@
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+
+# virtualenv
+venv/
+.venv/
+
+# env/secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# logs/db/runtime
+*.log
+*.sqlite
+*.sqlite3
+*.db
+
