@@ -151,11 +151,33 @@ async def cb_prompt_dyn_full(callback: CallbackQuery) -> None:
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"admin:prompt:dyn:edit:{short_key}")],
+            [InlineKeyboardButton(text="📥 Скачать .txt", callback_data=f"admin:prompt:dyn:download:{short_key}")],
+            [InlineKeyboardButton(text="✏️ Заменить (только .txt)", callback_data=f"admin:prompt:dyn:edit:{short_key}")],
             [InlineKeyboardButton(text="« Назад к динамике", callback_data="admin:prompt:dyn")],
         ]
     )
     await callback.message.answer("Выберите действие:", reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("admin:prompt:dyn:download:"))
+async def cb_prompt_dyn_download(callback: CallbackQuery) -> None:
+    if not can_edit_prompt(callback.from_user.id, callback.from_user.username):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    short_key = callback.data.rsplit(":", 1)[-1]
+    item = DYN_KEY_MAP.get(short_key)
+    if not item:
+        await callback.answer("Неизвестный блок", show_alert=True)
+        return
+    await callback.answer()
+    text = get_dynamic_block(item)
+    raw = text.encode("utf-8")
+    name = f"system_prompt_block_{item}_active.txt"
+    await callback.message.answer_document(
+        BufferedInputFile(raw, filename=name),
+        caption=f"Текущий блок `{item}` (UTF-8).",
+        parse_mode="Markdown",
+    )
 
 
 @router.callback_query(F.data.startswith("admin:prompt:dyn:edit:"))
@@ -172,7 +194,7 @@ async def cb_prompt_dyn_edit(callback: CallbackQuery, state: FSMContext) -> None
     await state.set_state(PromptAdminStates.waiting_dyn_text)
     await state.update_data(dyn_key=short_key)
     await callback.message.answer(
-        f"✏️ Редактирование: `{item}`\n\nПришлите новый текст сообщением или файлом .txt/.md (UTF-8).\nОтмена: /cancel",
+        f"✏️ Заменить блок: `{item}`\n\nПришлите новый текст файлом `.txt` (UTF-8).\nОтмена: /cancel",
         parse_mode="Markdown",
     )
 
@@ -207,24 +229,7 @@ async def dyn_edit_text(message: Message, state: FSMContext) -> None:
     if not can_edit_prompt(message.from_user.id, message.from_user.username):
         await state.clear()
         return
-    data = await state.get_data()
-    short_key = data.get("dyn_key")
-    item = DYN_KEY_MAP.get(short_key or "")
-    if not item:
-        await state.clear()
-        await message.answer("❌ Не удалось определить блок редактирования.")
-        return
-    text = (message.text or "").strip()
-    if not text:
-        await message.answer("Пустой текст. Пришлите данные или /cancel.")
-        return
-    try:
-        save_dynamic_block(item, text)
-    except ValueError as e:
-        await message.answer(f"❌ {e}")
-        return
-    await state.clear()
-    await message.answer(f"✅ Сохранено: {item}. Применяется сразу.")
+    await message.answer("❌ Для динамики замена только файлом `.txt` (UTF-8). Отмена: /cancel.", parse_mode="Markdown")
 
 
 @router.message(PromptAdminStates.waiting_new_prompt, F.document)
@@ -287,8 +292,8 @@ async def dyn_edit_document(message: Message, state: FSMContext, bot: Bot) -> No
         await message.answer("❌ Файл слишком большой (макс. 2 МБ).")
         return
     file_name = (doc.file_name or "").lower()
-    if file_name and not (file_name.endswith(".txt") or file_name.endswith(".md")):
-        await message.answer("❌ Пришлите `.txt` / `.md`.")
+    if file_name and not file_name.endswith(".txt"):
+        await message.answer("❌ Пришлите `.txt` (UTF-8).")
         return
     buf = io.BytesIO()
     try:
