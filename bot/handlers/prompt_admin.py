@@ -19,11 +19,10 @@ from bot.prompt_store import (
     uses_bundled_default,
 )
 from bot.handlers.admin import is_admin, is_prompt_only_editor
+from bot.utils import send_long
 
 logger = logging.getLogger(__name__)
 router = Router()
-
-TELEGRAM_TEXT_LIMIT = 4000
 
 
 class PromptAdminStates(StatesGroup):
@@ -37,12 +36,6 @@ DYN_KEY_MAP = {
     "rd": "risks_docs",
     "sp": "specialist_request",
 }
-
-
-def _split_for_telegram(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> list[str]:
-    if not text:
-        return ["(пусто)"]
-    return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
 def _prompt_status_line() -> str:
@@ -80,12 +73,7 @@ async def cb_prompt_full(callback: CallbackQuery) -> None:
         return
     await callback.answer("Отправляю…")
     core = get_core_prompt()
-    chunks = _split_for_telegram(core)
-    if len(chunks) == 1:
-        await callback.message.answer(f"📄 CORE system prompt\n\n{chunks[0]}")
-    else:
-        for i, chunk in enumerate(chunks):
-            await callback.message.answer(f"📄 CORE system prompt | часть {i + 1}\n\n{chunk}")
+    await send_long(callback.message, f"📄 CORE system prompt\n\n{core}")
 
 
 @router.callback_query(F.data == "admin:prompt:download")
@@ -111,7 +99,7 @@ async def cb_prompt_edit(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     await state.set_state(PromptAdminStates.waiting_new_prompt)
     await callback.message.answer(
-        "✏️ Пришлите новый CORE prompt одним сообщением или файлом .txt / .md (UTF-8).\n\n"
+        "✏️ Пришлите новый CORE prompt файлом .txt (UTF-8).\n\n"
         f"Ограничение: до {MAX_PROMPT_CHARS} символов.\n"
         "Отмена: /cancel",
     )
@@ -159,12 +147,7 @@ async def cb_prompt_dyn_full(callback: CallbackQuery) -> None:
     await callback.answer("Отправляю…")
     text = get_dynamic_block(item)
     title = f"BLOCK: {item}"
-    chunks = _split_for_telegram(text)
-    if len(chunks) == 1:
-        await callback.message.answer(f"📄 {title}\n\n{chunks[0]}")
-    else:
-        for i, chunk in enumerate(chunks):
-            await callback.message.answer(f"📄 {title} | часть {i + 1}\n\n{chunk}")
+    await send_long(callback.message, f"📄 {title}\n\n{text}")
 
     kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -216,17 +199,7 @@ async def prompt_edit_text(message: Message, state: FSMContext) -> None:
     if not can_edit_prompt(message.from_user.id, message.from_user.username):
         await state.clear()
         return
-    text = message.text or ""
-    if not text.strip():
-        await message.answer("Пустой текст. Пришлите промпт или /cancel.")
-        return
-    try:
-        save_core_prompt(text)
-    except ValueError as e:
-        await message.answer(f"❌ {e}")
-        return
-    await state.clear()
-    await message.answer(f"✅ CORE prompt сохранён ({len(text.strip())} символов). Изменения применяются сразу.")
+    await message.answer("❌ Пришлите CORE prompt только файлом `.txt` (UTF-8). Отмена: /cancel.")
 
 
 @router.message(PromptAdminStates.waiting_dyn_text, F.text)
@@ -266,8 +239,8 @@ async def prompt_edit_document(message: Message, state: FSMContext, bot: Bot) ->
         await message.answer("❌ Файл слишком большой (макс. 2 МБ).")
         return
     file_name = (doc.file_name or "").lower()
-    if file_name and not (file_name.endswith(".txt") or file_name.endswith(".md")):
-        await message.answer("❌ Пришлите `.txt` или `.md`, либо текстом в сообщении.")
+    if file_name and not file_name.endswith(".txt"):
+        await message.answer("❌ Пришлите `.txt` (UTF-8).")
         return
 
     buf = io.BytesIO()
