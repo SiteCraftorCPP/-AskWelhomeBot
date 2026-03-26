@@ -154,7 +154,7 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
 
     final_text, _ = _strip_fake_specialist_brackets(final_text)
 
-    # Кнопка «Связаться со специалистом» на каждый полезный ответ в личке (не только по ключевым словам).
+    # Inline-кнопка как в ТЗ: 👤 Подключить специалиста → callback about:specialist → заявка → уведомление в группу/тему.
     should_show_specialist_button = (
         bot_response.has_useful_content
         and not bot_response.is_error
@@ -180,7 +180,7 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     if should_show_specialist_button:
         reply_kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Связаться со специалистом", callback_data="about:specialist")],
+                [InlineKeyboardButton(text="👤 Подключить специалиста", callback_data="about:specialist")],
                 *feedback_kb.inline_keyboard,
             ]
         )
