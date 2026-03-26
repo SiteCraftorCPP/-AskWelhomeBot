@@ -51,18 +51,6 @@ def _strip_fake_specialist_brackets(text: str) -> tuple[str, bool]:
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text, text != before.strip()
 
-# Keywords that indicate need for specialist (for adding suggestion after answer)
-SPECIALIST_KEYWORDS = [
-    "оцен",
-    "за сколько",
-    "бюджет",
-    "что лучше",
-    "ипотек",
-    "налог",
-    "документ",
-]
-
-
 @router.message(
     F.text,
     ~F.text.startswith("/"),  # Exclude commands
@@ -164,15 +152,13 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     # Добавляем disclaimer, если нужно
     final_text = add_disclaimer_if_needed(bot_response)
 
-    final_text, stripped_brackets = _strip_fake_specialist_brackets(final_text)
+    final_text, _ = _strip_fake_specialist_brackets(final_text)
 
-    # Check if specialist suggestion is needed (after answer)
-    text_lower = text.lower()
-    needs_specialist_suggestion = any(keyword in text_lower for keyword in SPECIALIST_KEYWORDS)
-
+    # Кнопка «Связаться со специалистом» на каждый полезный ответ в личке (не только по ключевым словам).
     should_show_specialist_button = (
-        stripped_brackets
-        or (needs_specialist_suggestion and bot_response.has_useful_content)
+        bot_response.has_useful_content
+        and not bot_response.is_error
+        and not bot_response.is_system_message
     )
     
     # Save data for feedback

@@ -29,6 +29,13 @@ async def send_notification(
         )
         return False
 
+    # Только супергруппа/канал (отрицательный id). Личка и «чат с самим ботом» — запрещены.
+    if chat_id >= 0:
+        logger.warning(
+            "NOTIFICATION_CHAT_ID должен быть id супергруппы (-100...), не user id и не личка. Отправка отменена."
+        )
+        return False
+
     kwargs: dict[str, Any] = {"chat_id": chat_id, "text": text}
     if parse_mode:
         kwargs["parse_mode"] = parse_mode
