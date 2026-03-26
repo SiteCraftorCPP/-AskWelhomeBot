@@ -337,9 +337,9 @@ async def handle_details(message: Message, state: FSMContext) -> None:
         topic_id=getattr(Config, "LEADS_TOPIC_ID", 0),
         parse_mode="HTML",
     )
-    if not sent_ok and not Config.NOTIFICATION_CHAT_ID:
+    if not sent_ok:
         logger.warning(
-            "Заявка не отправлена: задай FEEDBACK_CHAT_ID + LEADS_TOPIC_ID или ADMIN_CHAT_IDS / ADMIN_CHAT_ID"
+            "Заявка не отправлена: проверь FEEDBACK_CHAT_ID, LEADS_TOPIC_ID и права бота в группе"
         )
     user_response = SPECIALIST_DONE_USER if sent_ok else SPECIALIST_DONE_USER_NO_ADMIN
     
