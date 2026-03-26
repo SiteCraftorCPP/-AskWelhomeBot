@@ -1,8 +1,10 @@
 """Handler for free text input (not commands or menu buttons)."""
 import logging
+import re
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from bot.texts import (
     MENU_RENT,
     MENU_BUY_SELL,
@@ -29,6 +31,9 @@ from bot.utils import (
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+# LLM may output this marker instead of a real Telegram button.
+_SPECIALIST_CTA_MARKER_RE = re.compile(r"\[\s*подключить специалиста\s*\]", re.IGNORECASE)
 
 # Keywords that indicate need for specialist (for adding suggestion after answer)
 SPECIALIST_KEYWORDS = [
@@ -138,14 +143,19 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     
     # Добавляем disclaimer, если нужно
     final_text = add_disclaimer_if_needed(bot_response)
+
+    # If LLM printed a "[Подключить специалиста]" marker, replace with a real button.
+    has_specialist_cta_marker = bool(_SPECIALIST_CTA_MARKER_RE.search(final_text))
+    if has_specialist_cta_marker:
+        final_text = _SPECIALIST_CTA_MARKER_RE.sub("", final_text).strip()
     
     # Check if specialist suggestion is needed (after answer)
     text_lower = text.lower()
     needs_specialist_suggestion = any(keyword in text_lower for keyword in SPECIALIST_KEYWORDS)
     
-    if needs_specialist_suggestion and bot_response.has_useful_content:
-        specialist_note = "\n\nЕсли хотите, можем подключить специалиста: опишите город/тип объекта/цель и бюджет (или \"не знаю\") — я передам запрос."
-        final_text += specialist_note
+    should_show_specialist_button = (needs_specialist_suggestion and bot_response.has_useful_content) or has_specialist_cta_marker
+    if should_show_specialist_button:
+        final_text += "\n\nЕсли хотите — нажмите кнопку ниже, и я начну оформление запроса специалисту."
     
     # Save data for feedback
     await state.update_data(
@@ -160,5 +170,16 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     # Add to legacy history (для обратной совместимости)
     add_history(user_id, "B", final_text)
     
+    # Reply markup: feedback + optional specialist button.
+    feedback_kb = get_feedback_keyboard()
+    reply_kb = feedback_kb
+    if should_show_specialist_button:
+        reply_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="Подключить специалиста", callback_data="about:specialist")],
+                *feedback_kb.inline_keyboard,
+            ]
+        )
+
     # Send using send_long
-    await send_long(message, final_text, reply_markup=get_feedback_keyboard())
+    await send_long(message, final_text, reply_markup=reply_kb)
