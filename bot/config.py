@@ -57,10 +57,17 @@ class Config:
     """Bot configuration."""
     
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
-    # Legacy: один ID; сливается с ADMIN_CHAT_IDS в общий список (равные права у всех).
-    ADMIN_CHAT_ID: int = _get_int("ADMIN_CHAT_ID", 0)
+    # Legacy: ADMIN_CHAT_ID раньше был одним числом.
+    # Теперь поддерживаем и "id1,id2" прямо в ADMIN_CHAT_ID.
+    _ADMIN_CHAT_ID_RAW: str = os.getenv("ADMIN_CHAT_ID", "")
+    _ADMIN_CHAT_ID_LIST_PARSED: list[int] = _parse_int_list(_ADMIN_CHAT_ID_RAW)
+    ADMIN_CHAT_ID: int = _ADMIN_CHAT_ID_LIST_PARSED[0] if _ADMIN_CHAT_ID_LIST_PARSED else _get_int("ADMIN_CHAT_ID", 0)
+
     _ADMIN_CHAT_IDS_PARSED: list[int] = _parse_int_list(os.getenv("ADMIN_CHAT_IDS", ""))
-    ADMIN_CHAT_IDS: list[int] = _merge_admin_chat_ids(_ADMIN_CHAT_IDS_PARSED, ADMIN_CHAT_ID)
+    ADMIN_CHAT_IDS: list[int] = _merge_admin_chat_ids(
+        _ADMIN_CHAT_IDS_PARSED + _ADMIN_CHAT_ID_LIST_PARSED,
+        ADMIN_CHAT_ID,
+    )
     # Список админов через запятую: @user1,@user2 или user1,user2
     ADMIN_USERNAMES: list[str] = [
         u.strip().lstrip("@").lower()
