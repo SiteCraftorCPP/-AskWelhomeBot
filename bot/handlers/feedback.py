@@ -13,6 +13,7 @@ from bot.state import FeedbackState, MenuState
 from bot.keyboards import get_feedback_reasons_kb
 from bot.utils import get_last_history
 from bot.config import Config
+from bot.notify import send_notification
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -71,24 +72,20 @@ async def handle_feedback_reason(callback: CallbackQuery, state: FSMContext) -> 
     history = get_last_history(user_id, n=10)
     history_text = "\n".join(history) if history else "История пуста"
     
-    # Send to admins if configured
-    admin_ids = [a for a in getattr(Config, "ADMIN_CHAT_IDS", []) if a > 0] or ([Config.ADMIN_CHAT_ID] if Config.ADMIN_CHAT_ID > 0 else [])
-    if admin_ids:
-        feedback_message = (
-            f"👎 Feedback\n"
-            f"Reason: {reason_name}\n"
-            f"User: {user_id} @{username}\n"
-            f"Section: {last_section}\n"
-            f"Q: {last_question}\n"
-            f"A: {last_answer}\n"
-            f"History:\n{history_text}"
-        )
-        for aid in admin_ids:
-            try:
-                await callback.message.bot.send_message(aid, feedback_message)
-                logger.info(f"Feedback sent to admin {aid}")
-            except Exception as e:
-                logger.error(f"Failed to send feedback to admin {aid}: {e}")
+    feedback_message = (
+        f"👎 Feedback\n"
+        f"Reason: {reason_name}\n"
+        f"User: {user_id} @{username}\n"
+        f"Section: {last_section}\n"
+        f"Q: {last_question}\n"
+        f"A: {last_answer}\n"
+        f"History:\n{history_text}"
+    )
+    await send_notification(
+        callback.message.bot,
+        feedback_message,
+        topic_id=getattr(Config, "FEEDBACK_TOPIC_ID", 0),
+    )
     
     # Save reason
     await state.update_data(last_feedback_reason=reason_name)
@@ -116,28 +113,24 @@ async def handle_feedback_other_comment(message: Message, state: FSMContext) -> 
     reason = data.get("last_feedback_reason", "📝 другое")
     selected_section = data.get("selected_section")
     
-    # Send to admins if configured
-    admin_ids = [a for a in getattr(Config, "ADMIN_CHAT_IDS", []) if a > 0] or ([Config.ADMIN_CHAT_ID] if Config.ADMIN_CHAT_ID > 0 else [])
-    if admin_ids:
-        feedback_message = (
-            f"👎 Feedback\n"
-            f"Reason: {reason}\n"
-            f"Other comment: {comment}\n"
-            f"User: {user_id} @{username}\n"
-            f"Section: {data.get('last_section', '')}\n"
-            f"Q: {data.get('last_question_text', '')}\n"
-            f"A: {data.get('last_answer_text', '')}\n"
-        )
-        history = get_last_history(user_id, n=10)
-        if history:
-            feedback_message += f"History:\n{chr(10).join(history)}"
-        
-        for aid in admin_ids:
-            try:
-                await message.bot.send_message(aid, feedback_message)
-                logger.info(f"Feedback with comment sent to admin {aid}")
-            except Exception as e:
-                logger.error(f"Failed to send feedback to admin {aid}: {e}")
+    feedback_message = (
+        f"👎 Feedback\n"
+        f"Reason: {reason}\n"
+        f"Other comment: {comment}\n"
+        f"User: {user_id} @{username}\n"
+        f"Section: {data.get('last_section', '')}\n"
+        f"Q: {data.get('last_question_text', '')}\n"
+        f"A: {data.get('last_answer_text', '')}\n"
+    )
+    history = get_last_history(user_id, n=10)
+    if history:
+        feedback_message += f"History:\n{chr(10).join(history)}"
+
+    await send_notification(
+        message.bot,
+        feedback_message,
+        topic_id=getattr(Config, "FEEDBACK_TOPIC_ID", 0),
+    )
     
     # Thank user
     await message.answer(FEEDBACK_DOWN_THANKS)

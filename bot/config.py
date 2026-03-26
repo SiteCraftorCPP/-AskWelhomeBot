@@ -81,6 +81,12 @@ class Config:
         if u.strip()
     ]
     LOGO_PATH: str = os.getenv("LOGO_PATH", "assets/logo.png")
+
+    # Уведомления в супергруппу с темами (forum): chat_id + message_thread_id из /chatinfo в каждой теме
+    FEEDBACK_CHAT_ID: int = _get_int("FEEDBACK_CHAT_ID", 0)
+    NOTIFICATION_CHAT_ID: int = _get_int("NOTIFICATION_CHAT_ID", 0) or FEEDBACK_CHAT_ID
+    LEADS_TOPIC_ID: int = _get_int("LEADS_TOPIC_ID", 0)
+    FEEDBACK_TOPIC_ID: int = _get_int("FEEDBACK_TOPIC_ID", 0)
     
     # ProxyAPI configuration (основной провайдер)
     PROXYAPI_API_KEY: str = os.getenv("PROXYAPI_API_KEY", "")

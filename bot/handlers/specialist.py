@@ -18,6 +18,7 @@ from bot.texts import (
 )
 from bot.keyboards import get_cancel_kb, get_main_menu_inline
 from bot.config import Config
+from bot.notify import send_notification
 from bot.context import (
     get_session_context,
     update_session_context,
@@ -329,21 +330,18 @@ async def handle_details(message: Message, state: FSMContext) -> None:
     
     admin_message += f"Детали: {details}"
     
-    # Send to admins if configured
-    admin_ids = [a for a in getattr(Config, "ADMIN_CHAT_IDS", []) if a > 0] or ([Config.ADMIN_CHAT_ID] if Config.ADMIN_CHAT_ID > 0 else [])
-    if admin_ids:
-        sent_ok = False
-        for aid in admin_ids:
-            try:
-                await message.bot.send_message(aid, admin_message, parse_mode="HTML")
-                logger.info(f"Specialist request sent to admin {aid} from user {user_id}")
-                sent_ok = True
-            except Exception as e:
-                logger.error(f"Failed to send specialist request to admin {aid}: {e}")
-        user_response = SPECIALIST_DONE_USER if sent_ok else SPECIALIST_DONE_USER_NO_ADMIN
-    else:
-        logger.warning("No admin IDs in .env (ADMIN_CHAT_IDS / ADMIN_CHAT_ID), request not sent to admins")
-        user_response = SPECIALIST_DONE_USER_NO_ADMIN
+    # Супергруппа + LEADS_TOPIC_ID или личка админам
+    sent_ok = await send_notification(
+        message.bot,
+        admin_message,
+        topic_id=getattr(Config, "LEADS_TOPIC_ID", 0),
+        parse_mode="HTML",
+    )
+    if not sent_ok and not Config.NOTIFICATION_CHAT_ID:
+        logger.warning(
+            "Заявка не отправлена: задай FEEDBACK_CHAT_ID + LEADS_TOPIC_ID или ADMIN_CHAT_IDS / ADMIN_CHAT_ID"
+        )
+    user_response = SPECIALIST_DONE_USER if sent_ok else SPECIALIST_DONE_USER_NO_ADMIN
     
     # Clear specialist state but preserve selected_section
     await state.clear()
