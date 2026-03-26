@@ -169,53 +169,86 @@ def get_last_history(user_id: int, n: int = 10) -> list[str]:
 
 def split_long_message(text: str, max_length: int = 3500) -> list[str]:
     """
-    Split long message into chunks.
-    
-    Args:
-        text: Message text
-        max_length: Maximum length per chunk
-        
-    Returns:
-        List of text chunks
+    Split long message into chunks that are guaranteed to fit Telegram limits.
+
+    Strategy:
+    - Prefer splitting by blank-line paragraphs.
+    - If a paragraph is too long, split by single newlines.
+    - If a line is too long, hard-slice by max_length.
     """
+    text = (text or "").strip()
+    if not text:
+        return [""]
+    if max_length <= 0:
+        return [text]
     if len(text) <= max_length:
         return [text]
-    
-    chunks = []
-    current_chunk = ""
-    
-    # Try to split by paragraphs first
-    paragraphs = text.split("\n\n")
-    
-    for para in paragraphs:
-        if len(current_chunk) + len(para) + 2 <= max_length:
-            if current_chunk:
-                current_chunk += "\n\n" + para
+
+    chunks: list[str] = []
+    buf = ""
+
+    def flush() -> None:
+        nonlocal buf
+        if buf:
+            chunks.append(buf)
+            buf = ""
+
+    def push_piece(piece: str, sep: str) -> None:
+        nonlocal buf
+        piece = (piece or "").strip()
+        if not piece:
+            return
+
+        # If piece itself too large, split further outside.
+        if len(piece) > max_length:
+            flush()
+            for i in range(0, len(piece), max_length):
+                chunks.append(piece[i : i + max_length])
+            return
+
+        candidate = piece if not buf else (buf + sep + piece)
+        if len(candidate) <= max_length:
+            buf = candidate
+            return
+
+        flush()
+        buf = piece
+
+    # paragraphs
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if not para:
+            continue
+        if len(para) <= max_length:
+            push_piece(para, "\n\n")
+            continue
+
+        # too long paragraph -> split by lines
+        for line in para.split("\n"):
+            line = line.rstrip()
+            if not line:
+                continue
+            if len(line) <= max_length:
+                push_piece(line, "\n")
             else:
-                current_chunk = para
+                # line too long -> hard slice
+                flush()
+                for i in range(0, len(line), max_length):
+                    chunks.append(line[i : i + max_length])
+
+        flush()
+
+    flush()
+
+    # Safety: enforce length limit (should already hold)
+    out: list[str] = []
+    for c in chunks:
+        if len(c) <= max_length:
+            out.append(c)
         else:
-            if current_chunk:
-                chunks.append(current_chunk)
-            # If paragraph itself is too long, split by sentences
-            if len(para) > max_length:
-                sentences = para.split(". ")
-                for sent in sentences:
-                    if len(current_chunk) + len(sent) + 2 <= max_length:
-                        if current_chunk:
-                            current_chunk += ". " + sent
-                        else:
-                            current_chunk = sent
-                    else:
-                        if current_chunk:
-                            chunks.append(current_chunk)
-                        current_chunk = sent
-            else:
-                current_chunk = para
-    
-    if current_chunk:
-        chunks.append(current_chunk)
-    
-    return chunks if chunks else [text[:max_length]]
+            for i in range(0, len(c), max_length):
+                out.append(c[i : i + max_length])
+    return out or [text[:max_length]]
 
 
 async def send_long(
