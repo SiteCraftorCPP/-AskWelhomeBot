@@ -35,6 +35,15 @@ if openrouter_key_initial:
 
 FALLBACK_MESSAGE = "Сервис временно недоступен, попробуйте позже."
 
+# Всегда дописываем: модель любит «рисовать» несуществующие кнопки в квадратных скобках.
+_TELEGRAM_UI_RULE = (
+    "\n\n"
+    "ИНТЕРФЕЙС TELEGRAM (обязательно):\n"
+    "- Запрещено имитировать кнопки текстом в квадратных скобках: [Связаться…], [Подключить специалиста] и любые […] как «кнопки».\n"
+    "- Если уместна связь со специалистом: дай полезный ответ и 1–2 коротких уточняющих вопроса по делу; не пиши «нажмите кнопку» — реальная inline-кнопка показывается ботом отдельно.\n"
+    "- Не дублируй призывы «нажмите кнопку ниже»."
+)
+
 
 def build_system_prompt(context: dict | None = None) -> str:
     """
@@ -50,7 +59,7 @@ def build_system_prompt(context: dict | None = None) -> str:
     base_prompt = get_core_prompt()
     
     if not context:
-        return base_prompt
+        return base_prompt + _TELEGRAM_UI_RULE
     
     context_addition = ""
     
@@ -73,7 +82,7 @@ def build_system_prompt(context: dict | None = None) -> str:
             context_addition += json.dumps(filtered_data, ensure_ascii=False, indent=2)
             context_addition += f"\nИспользуй эту информацию в своих ответах.\n"
     
-    return base_prompt + context_addition
+    return base_prompt + context_addition + _TELEGRAM_UI_RULE
 
 
 async def generate_reply(

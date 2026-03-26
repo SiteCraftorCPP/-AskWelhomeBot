@@ -32,8 +32,24 @@ from bot.utils import (
 logger = logging.getLogger(__name__)
 router = Router()
 
-# LLM may output this marker instead of a real Telegram button.
-_SPECIALIST_CTA_MARKER_RE = re.compile(r"\[\s*подключить специалиста\s*\]", re.IGNORECASE)
+def _strip_fake_specialist_brackets(text: str) -> tuple[str, bool]:
+    """
+    Убирает псевдо-кнопки […], которые модель пишет вместо реальной inline-кнопки.
+    Возвращает (очищенный текст, были_ли_удаления).
+    """
+    before = text
+    # Строка целиком — только [текст] (типичный мусор «кнопки»)
+    text = re.sub(r"^\s*\[[^\]]{1,200}\]\s*$", "", text, flags=re.MULTILINE)
+    # Известные формулировки внутри текста
+    for pat in (
+        r"\[\s*связаться\s+со\s+специалистом\s*\]",
+        r"\[\s*связь\s+со\s+специалистом\s*\]",
+        r"\[\s*подключить\s+специалиста\s*\]",
+        r"\[\s*связаться\s+с\s+менеджером\s*\]",
+    ):
+        text = re.sub(pat, "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    return text, text != before.strip()
 
 # Keywords that indicate need for specialist (for adding suggestion after answer)
 SPECIALIST_KEYWORDS = [
@@ -148,18 +164,16 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     # Добавляем disclaimer, если нужно
     final_text = add_disclaimer_if_needed(bot_response)
 
-    # If LLM printed a "[Подключить специалиста]" marker, replace with a real button.
-    has_specialist_cta_marker = bool(_SPECIALIST_CTA_MARKER_RE.search(final_text))
-    if has_specialist_cta_marker:
-        final_text = _SPECIALIST_CTA_MARKER_RE.sub("", final_text).strip()
-    
+    final_text, stripped_brackets = _strip_fake_specialist_brackets(final_text)
+
     # Check if specialist suggestion is needed (after answer)
     text_lower = text.lower()
     needs_specialist_suggestion = any(keyword in text_lower for keyword in SPECIALIST_KEYWORDS)
-    
-    should_show_specialist_button = (needs_specialist_suggestion and bot_response.has_useful_content) or has_specialist_cta_marker
-    if should_show_specialist_button:
-        final_text += "\n\nЕсли хотите — нажмите кнопку ниже, и я начну оформление запроса специалисту."
+
+    should_show_specialist_button = (
+        stripped_brackets
+        or (needs_specialist_suggestion and bot_response.has_useful_content)
+    )
     
     # Save data for feedback
     await state.update_data(
@@ -180,7 +194,7 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     if should_show_specialist_button:
         reply_kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="Подключить специалиста", callback_data="about:specialist")],
+                [InlineKeyboardButton(text="Связаться со специалистом", callback_data="about:specialist")],
                 *feedback_kb.inline_keyboard,
             ]
         )
