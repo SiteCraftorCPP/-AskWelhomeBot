@@ -54,6 +54,10 @@ SPECIALIST_KEYWORDS = [
 )
 async def handle_free_text(message: Message, state: FSMContext) -> None:
     """Handle free text input: check feedback state, generate LLM reply with disclaimers."""
+    # In groups/topics this bot should not run LLM dialog.
+    if message.chat.type != "private":
+        return
+
     user_id = message.from_user.id
     username = message.from_user.username or "N/A"
     text = message.text
