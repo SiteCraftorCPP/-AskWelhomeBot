@@ -33,6 +33,14 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     
     # Send onboarding text
     await message.answer(ONBOARDING_TEXT)
+
+    # Send report PDF after greeting (if exists)
+    if os.path.exists(Config.REPORT_PDF_PATH):
+        try:
+            with open(Config.REPORT_PDF_PATH, "rb") as report_file:
+                await message.answer_document(document=report_file)
+        except Exception as e:
+            logger.warning(f"Failed to send report PDF: {e}")
     
     # Show main menu (inline)
     await message.answer(

@@ -81,6 +81,7 @@ class Config:
         if u.strip()
     ]
     LOGO_PATH: str = os.getenv("LOGO_PATH", "assets/logo.png")
+    REPORT_PDF_PATH: str = os.getenv("REPORT_PDF_PATH", "Итоги 2025 Москва-СПб.pdf")
 
     # Уведомления в супергруппу с темами (forum): chat_id + message_thread_id из /chatinfo в каждой теме
     FEEDBACK_CHAT_ID: int = _get_int("FEEDBACK_CHAT_ID", 0)
