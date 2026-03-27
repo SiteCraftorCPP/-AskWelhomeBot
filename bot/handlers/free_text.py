@@ -111,9 +111,11 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
     if collected_data.get("urgency"):
         session_data["urgency"] = collected_data["urgency"]
     
-    # Send loading messages
-    loading_msg1 = await message.answer("🤔")
-    loading_msg2 = await message.answer("<i>Анализирую ваш вопрос и готовлю ответ…</i>", parse_mode="HTML")
+    # Одно сообщение: иначе отдельное сообщение только с эмодзи в Telegram = огромная «картинка» (раньше 🤖 выглядел как робот)
+    loading_msg = await message.answer(
+        "🤔 <i>Анализирую ваш вопрос и готовлю ответ…</i>",
+        parse_mode="HTML",
+    )
     
     # Определяем topic для BotResponse
     if is_docs_or_taxes_topic(text, selected_section):
@@ -142,12 +144,11 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
         error_context = {"user_id": user_id}
         bot_response = handle_error(e, error_context)
     finally:
-        # Delete loading messages
+        # Delete loading message
         try:
-            await loading_msg1.delete()
-            await loading_msg2.delete()
+            await loading_msg.delete()
         except Exception as e:
-            logger.warning(f"Failed to delete loading messages: {e}")
+            logger.warning(f"Failed to delete loading message: {e}")
     
     # Добавляем disclaimer, если нужно
     final_text = add_disclaimer_if_needed(bot_response)
