@@ -112,7 +112,7 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
         session_data["urgency"] = collected_data["urgency"]
     
     # Send loading messages
-    loading_msg1 = await message.answer("🤖")
+    loading_msg1 = await message.answer("🤔")
     loading_msg2 = await message.answer("<i>Анализирую ваш вопрос и готовлю ответ…</i>", parse_mode="HTML")
     
     # Определяем topic для BotResponse
