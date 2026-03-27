@@ -1,6 +1,6 @@
 """Text constants for bot messages."""
 
-ONBOARDING_TEXT = """👋 Добро пожаловать!
+ONBOARDING_TEXT = """🤔 Добро пожаловать!
 
 Я — интеллектуальный помощник Welhome.
 
