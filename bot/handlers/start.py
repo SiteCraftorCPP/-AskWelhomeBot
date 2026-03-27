@@ -3,7 +3,7 @@ import os
 import logging
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, FSInputFile
 from aiogram.fsm.context import FSMContext
 from bot.config import Config
 from bot.keyboards import get_main_menu_inline
@@ -34,13 +34,17 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     # Send onboarding text
     await message.answer(ONBOARDING_TEXT)
 
-    # Send report PDF after greeting (if exists)
-    if os.path.exists(Config.REPORT_PDF_PATH):
+    # Send report PDF after greeting (path в Config уже абсолютный от корня проекта)
+    if Config.REPORT_PDF_PATH and os.path.isfile(Config.REPORT_PDF_PATH):
         try:
-            with open(Config.REPORT_PDF_PATH, "rb") as report_file:
-                await message.answer_document(document=report_file)
+            await message.answer_document(
+                FSInputFile(Config.REPORT_PDF_PATH),
+                caption="Итоги 2025 — Москва и Санкт-Петербург",
+            )
         except Exception as e:
-            logger.warning(f"Failed to send report PDF: {e}")
+            logger.warning("Failed to send report PDF: %s", e, exc_info=True)
+    else:
+        logger.warning("Report PDF not found at: %s", Config.REPORT_PDF_PATH)
     
     # Show main menu (inline)
     await message.answer(

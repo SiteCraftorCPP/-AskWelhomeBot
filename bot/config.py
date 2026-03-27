@@ -11,6 +11,17 @@ env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path)
 
 
+def _absolute_from_project(p: str) -> str:
+    """Путь относительно корня репозитория (для systemd cwd не важен)."""
+    p = (p or "").strip()
+    if not p:
+        return ""
+    path = Path(p)
+    if path.is_absolute():
+        return str(path)
+    return str(project_root / path)
+
+
 def _parse_int_list(value: str) -> list[int]:
     """
     Parse comma-separated list of ints from env (e.g. "1,2,3").
@@ -80,8 +91,10 @@ class Config:
         for u in os.getenv("PROMPT_ADMIN_USERNAMES", "").split(",")
         if u.strip()
     ]
-    LOGO_PATH: str = os.getenv("LOGO_PATH", "assets/logo.png")
-    REPORT_PDF_PATH: str = os.getenv("REPORT_PDF_PATH", "Итоги 2025 Москва-СПб.pdf")
+    LOGO_PATH: str = _absolute_from_project(os.getenv("LOGO_PATH", "assets/logo.png"))
+    REPORT_PDF_PATH: str = _absolute_from_project(
+        os.getenv("REPORT_PDF_PATH", "Итоги 2025 Москва-СПб.pdf")
+    )
 
     # Уведомления в супергруппу с темами (forum): chat_id + message_thread_id из /chatinfo в каждой теме
     FEEDBACK_CHAT_ID: int = _get_int("FEEDBACK_CHAT_ID", 0)
