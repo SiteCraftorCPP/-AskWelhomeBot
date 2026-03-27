@@ -22,6 +22,21 @@ def _absolute_from_project(p: str) -> str:
     return str(project_root / path)
 
 
+def _resolve_report_pdf_path() -> str:
+    """Отчёт: env REPORT_PDF_PATH или первый существующий из типовых имён."""
+    env = os.getenv("REPORT_PDF_PATH")
+    if env:
+        return _absolute_from_project(env)
+    for rel in (
+        "assets/report_2025_msk_spb.pdf",
+        "Итоги 2025 Москва-СПб.pdf",
+    ):
+        p = _absolute_from_project(rel)
+        if p and Path(p).is_file():
+            return p
+    return _absolute_from_project("assets/report_2025_msk_spb.pdf")
+
+
 def _parse_int_list(value: str) -> list[int]:
     """
     Parse comma-separated list of ints from env (e.g. "1,2,3").
@@ -92,9 +107,7 @@ class Config:
         if u.strip()
     ]
     LOGO_PATH: str = _absolute_from_project(os.getenv("LOGO_PATH", "assets/logo.png"))
-    REPORT_PDF_PATH: str = _absolute_from_project(
-        os.getenv("REPORT_PDF_PATH", "Итоги 2025 Москва-СПб.pdf")
-    )
+    REPORT_PDF_PATH: str = _resolve_report_pdf_path()
 
     # Уведомления в супергруппу с темами (forum): chat_id + message_thread_id из /chatinfo в каждой теме
     FEEDBACK_CHAT_ID: int = _get_int("FEEDBACK_CHAT_ID", 0)
