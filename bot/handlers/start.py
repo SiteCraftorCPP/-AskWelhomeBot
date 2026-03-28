@@ -1,7 +1,7 @@
 """Handler for /start command."""
 import os
 import logging
-from aiogram import Router, F
+from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message, FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -13,12 +13,25 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-@router.message(F.text == "/start")
+@router.message(Command("start"))
 async def cmd_start(message: Message, state: FSMContext) -> None:
     """Handle /start command: send logo (if exists), onboarding text, and main menu."""
     user_id = message.from_user.id
     username = message.from_user.username
     logger.info(f"User {user_id} (@{username}) sent /start")
+
+    if Config.ENABLE_ANALYTICS:
+        try:
+            from bot.users_registry import record_first_start
+
+            record_first_start(
+                user_id,
+                username,
+                message.from_user.first_name,
+                message.from_user.last_name,
+            )
+        except Exception as e:
+            logger.warning("users_registry record_first_start: %s", e, exc_info=True)
     
     # Reset state
     await state.clear()

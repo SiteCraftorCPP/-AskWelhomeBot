@@ -25,4 +25,5 @@ Desktop.ini
 *.sqlite
 *.sqlite3
 *.db
+data/users_registry.json
 

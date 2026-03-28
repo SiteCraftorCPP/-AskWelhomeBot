@@ -124,6 +124,7 @@ async def cb_prompt_back(callback: CallbackQuery) -> None:
         reply_markup=get_admin_panel_kb(
             show_prompt=can_edit_prompt(uid, un),
             prompt_only=is_prompt_only_editor(uid, un),
+            show_users_stats=is_admin(uid, un),
         ),
     )
 
