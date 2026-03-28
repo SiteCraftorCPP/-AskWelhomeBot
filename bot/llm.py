@@ -45,6 +45,63 @@ _TELEGRAM_UI_RULE = (
     "- Брендинг: используй только название «Welhome». Никогда не упоминай «FB ActiveGroup» или другие бренды."
 )
 
+# Окно истории в chat completion (сообщения U + B)
+CHAT_HISTORY_MAX_MESSAGES = 12
+_CHAT_USER_MAX_LEN = 2000
+_CHAT_ASSISTANT_MAX_LEN = 6000
+
+
+def _build_openai_messages(
+    system_prompt: str,
+    section: str | None,
+    conversation_history: list[dict] | None,
+    fallback_user_text: str,
+) -> list[dict]:
+    """
+    system + последние N реплик (U -> user, B -> assistant).
+    У последнего сообщения пользователя добавляем выбранный раздел (текущий ход).
+    """
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    section_text = section if section else "не выбран"
+    hist = list(conversation_history or [])
+    hist = hist[-CHAT_HISTORY_MAX_MESSAGES:]
+
+    if not hist:
+        u = (fallback_user_text or "")[:_CHAT_USER_MAX_LEN]
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Выбранный раздел: {section_text}\n\nВопрос пользователя:\n{u}",
+            }
+        )
+        return messages
+
+    last_u_idx = -1
+    for i in range(len(hist) - 1, -1, -1):
+        if hist[i].get("role") == "U":
+            last_u_idx = i
+            break
+
+    for i, item in enumerate(hist):
+        role = item.get("role")
+        text = (item.get("text") or "").strip()
+        if not text:
+            continue
+        if role == "U":
+            if i == last_u_idx:
+                content = (
+                    f"Выбранный раздел: {section_text}\n\nВопрос пользователя:\n"
+                    f"{text[:_CHAT_USER_MAX_LEN]}"
+                )
+            else:
+                content = text[:_CHAT_USER_MAX_LEN]
+            messages.append({"role": "user", "content": content})
+        elif role == "B":
+            messages.append(
+                {"role": "assistant", "content": text[:_CHAT_ASSISTANT_MAX_LEN]}
+            )
+    return messages
+
 
 def build_system_prompt(context: dict | None = None) -> str:
     """
@@ -82,7 +139,15 @@ def build_system_prompt(context: dict | None = None) -> str:
         if filtered_data:
             context_addition += json.dumps(filtered_data, ensure_ascii=False, indent=2)
             context_addition += f"\nИспользуй эту информацию в своих ответах.\n"
-    
+
+    ch = context.get("conversation_history") or []
+    if isinstance(ch, list) and len(ch) > 0:
+        context_addition += (
+            "\n\nДИАЛОГ: в запрос передаётся история переписки (пользователь и ассистент). "
+            "Учитывай уже названные параметры объекта/сделки (город, ЖК, площадь, бюджет и т.д.) "
+            "и не переспрашивай их без необходимости."
+        )
+
     return base_prompt + context_addition + _TELEGRAM_UI_RULE
 
 
@@ -136,7 +201,8 @@ async def generate_reply(
             # Старый формат - преобразуем в новый
             context = {
                 "collected_data": {},
-                "asked_questions": session_data.get("asked_questions", [])
+                "asked_questions": session_data.get("asked_questions", []),
+                "conversation_history": session_data.get("conversation_history", []),
             }
             # Переносим поля в collected_data
             if session_data.get("city"):
@@ -154,16 +220,16 @@ async def generate_reply(
     
     # Build system prompt with context
     system_prompt = build_system_prompt(context if context else None)
-    
-    # Trim user text to 2000 characters
-    trimmed_user_text = user_text[:2000] if len(user_text) > 2000 else user_text
-    
-    # Prepare user message
-    section_text = section if section else "не выбран"
-    user_message_parts = [f"Выбранный раздел: {section_text}"]
-    
-    user_message_parts.append(f"\nВопрос пользователя:\n{trimmed_user_text}")
-    user_message = "\n".join(user_message_parts)
+
+    conv_hist: list[dict] = []
+    if session_data:
+        conv_hist = session_data.get("conversation_history") or []
+    api_messages = _build_openai_messages(
+        system_prompt,
+        section,
+        conv_hist,
+        user_text,
+    )
     
     # Flag to track if we should try OpenRouter as fallback after ProxyAPI error
     try_openrouter_fallback = False
@@ -177,10 +243,7 @@ async def generate_reply(
             # - temperature не поддерживается (только значение по умолчанию 1)
             response = await proxyapi_client.chat.completions.create(
                 model=Config.PROXYAPI_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
+                messages=api_messages,
                 max_completion_tokens=Config.PROXYAPI_MAX_TOKENS
             )
             
@@ -229,10 +292,7 @@ async def generate_reply(
                             try:
                                 retry_response = await proxyapi_client.chat.completions.create(
                                     model=Config.PROXYAPI_MODEL,
-                                    messages=[
-                                        {"role": "system", "content": system_prompt},
-                                        {"role": "user", "content": user_message}
-                                    ],
+                                    messages=api_messages,
                                     max_completion_tokens=min(Config.PROXYAPI_MAX_TOKENS * 2, 8000)
                                 )
                                 if retry_response.choices and len(retry_response.choices) > 0:
@@ -340,10 +400,7 @@ async def generate_reply(
         try:
             response = await openrouter_client.chat.completions.create(
                 model=Config.OPENROUTER_MODEL,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
+                messages=api_messages,
                 temperature=0.3,
                 max_tokens=Config.OPENROUTER_MAX_TOKENS
             )

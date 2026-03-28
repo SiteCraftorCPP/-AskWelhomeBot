@@ -84,19 +84,18 @@ async def handle_free_text(message: Message, state: FSMContext) -> None:
         return
     
     # Regular question handling - ALWAYS call LLM first (v1.1 principle)
-    # Получаем контекст сессии
+    # Сначала фиксируем реплику в истории — иначе generate_reply не увидит текущее сообщение
+    await add_to_conversation_history(state, "U", text)
     context = await get_session_context(state)
     selected_section = context.get("selected_section")
-    
-    # Добавляем сообщение в историю разговора
-    await add_to_conversation_history(state, "U", text)
-    
+
     # Подготавливаем session_data для LLM (для обратной совместимости)
     collected_data = context.get("collected_data", {})
     session_data = {
         "collected_data": collected_data,
         "asked_questions": context.get("asked_questions", []),
         "selected_section": selected_section,
+        "conversation_history": context.get("conversation_history", []),
     }
     
     # Также добавляем плоские поля для обратной совместимости
