@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _MSK = ZoneInfo("Europe/Moscow")
-_PREVIEW_LINES = 20
+PAGE_SIZE = 12
 
 
 def _format_msk(iso_ts: str | None) -> str:
@@ -34,43 +34,82 @@ def _format_msk(iso_ts: str | None) -> str:
         return iso_ts[:19] if len(iso_ts) >= 19 else iso_ts
 
 
-def _preview_text(total: int, items: list[dict]) -> str:
+def _build_page_html(items: list[dict], page: int) -> tuple[str, int, int]:
+    """
+    HTML одной страницы. Возвращает (текст, страница 0-based, всего страниц).
+    """
+    total = len(items)
+    if total == 0:
+        return "<b>📊 Пользователи</b>", 0, 1
+
+    total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    start = page * PAGE_SIZE
+    chunk = items[start : start + PAGE_SIZE]
+
     lines = [
-        "<b>📊 Пользователи</b>",
-        "",
-        f"Всего зафиксировано первых <code>/start</code>: <b>{total}</b>",
-        "",
-        f"<i>Последние {_PREVIEW_LINES} (новые сверху):</i>",
+        f"<b>📊 Пользователи</b>  <i>{page + 1}/{total_pages}</i>",
         "",
     ]
-    chunk = items[:_PREVIEW_LINES]
-    if not chunk:
-        lines.append("<i>Пока никого.</i>")
-        return "\n".join(lines)
     for row in chunk:
         uid = row.get("user_id", "")
         un = row.get("username")
         fn = row.get("first_name") or ""
         ln = row.get("last_name") or ""
         name = " ".join(p for p in (fn, ln) if p).strip() or "—"
-        at = f"@{escape(un)}" if un else "<i>без username</i>"
+        at = f"@{escape(un)}" if un else "<i>—</i>"
         when = _format_msk(row.get("first_seen_at"))
         lines.append(
-            f"• <code>{uid}</code> {at} — {escape(name)}\n  {escape(when)}"
+            f"• <code>{uid}</code> {at}\n  {escape(name)} · {escape(when)}"
         )
-    if total > _PREVIEW_LINES:
-        lines.append("")
-        lines.append(f"<i>… и ещё {total - _PREVIEW_LINES}. Полный список — кнопка ниже.</i>")
-    return "\n".join(lines)
+    return "\n".join(lines), page, total_pages
 
 
-def _users_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📥 Скачать полный список (.txt)", callback_data="admin:users:export")],
-            [InlineKeyboardButton(text="« В админ-панель", callback_data="admin:users:back")],
-        ]
+def _users_kb(page: int, total_pages: int, has_rows: bool) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+    if has_rows and total_pages > 1:
+        nav: list[InlineKeyboardButton] = []
+        if page > 0:
+            nav.append(
+                InlineKeyboardButton(text="◀", callback_data=f"admin:users:p:{page - 1}")
+            )
+        nav.append(
+            InlineKeyboardButton(
+                text=f"· {page + 1}/{total_pages} ·",
+                callback_data="admin:users:noop",
+            )
+        )
+        if page < total_pages - 1:
+            nav.append(
+                InlineKeyboardButton(text="▶", callback_data=f"admin:users:p:{page + 1}")
+            )
+        rows.append(nav)
+    rows.append(
+        [InlineKeyboardButton(text="📥 Скачать .txt", callback_data="admin:users:export")]
     )
+    rows.append(
+        [InlineKeyboardButton(text="« В админ-панель", callback_data="admin:users:back")]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _show_users_screen(
+    callback: CallbackQuery,
+    page: int,
+    *,
+    edit: bool,
+) -> None:
+    _, items = get_stats()
+    text, page, total_pages = _build_page_html(items, page)
+    kb = _users_kb(page, total_pages, bool(items))
+    if edit:
+        try:
+            await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception as e:
+            logger.warning("admin users edit_text: %s", e)
+            await callback.message.answer(text, reply_markup=kb, parse_mode="HTML")
+    else:
+        await callback.message.answer(text, reply_markup=kb, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "admin:users")
@@ -81,13 +120,31 @@ async def cb_users_menu(callback: CallbackQuery) -> None:
         await callback.answer("Нет доступа", show_alert=True)
         return
     await callback.answer()
-    total, items = get_stats()
-    text = _preview_text(total, items)
+    await _show_users_screen(callback, 0, edit=True)
+
+
+@router.callback_query(F.data == "admin:users:noop")
+async def cb_users_noop(callback: CallbackQuery) -> None:
+    if not is_admin(callback.from_user.id, callback.from_user.username):
+        await callback.answer()
+        return
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("admin:users:p:"))
+async def cb_users_page(callback: CallbackQuery) -> None:
+    uid = callback.from_user.id
+    un = callback.from_user.username
+    if not is_admin(uid, un):
+        await callback.answer("Нет доступа", show_alert=True)
+        return
+    suffix = (callback.data or "").removeprefix("admin:users:p:")
     try:
-        await callback.message.edit_text(text, reply_markup=_users_kb(), parse_mode="HTML")
-    except Exception as e:
-        logger.warning("admin users edit_text: %s", e)
-        await callback.message.answer(text, reply_markup=_users_kb(), parse_mode="HTML")
+        page = int(suffix)
+    except ValueError:
+        page = 0
+    await callback.answer()
+    await _show_users_screen(callback, page, edit=True)
 
 
 @router.callback_query(F.data == "admin:users:export")
@@ -102,7 +159,7 @@ async def cb_users_export(callback: CallbackQuery) -> None:
     name = f"users_first_start_{Config.BOT_VERSION.replace('.', '_')}.txt"
     await callback.message.answer_document(
         BufferedInputFile(raw, filename=name),
-        caption="Реестр первых /start: user_id, UTC-время, username, имя.",
+        caption="Реестр первых /start (TSV).",
     )
 
 
