@@ -4,9 +4,10 @@ Telegram-бот Welhome (aiogram 3).
 
 ## Локальный запуск
 
-Из корня репозитория (нужен `.env` с `BOT_TOKEN` и ключами LLM):
+Сначала перейди в каталог с клоном репозитория, потом команды (нужен `.env` с `BOT_TOKEN` и ключами LLM):
 
 ```powershell
+cd "C:\path\to\agrealty-bot2"
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -15,9 +16,22 @@ python -m bot.main
 
 ## Обновление кода (сервер / прод)
 
-Подставьте путь к клону репозитория и имя сервиса, если бот крутится под systemd.
+### Прод (VPS: пользователь `askwelhomebot`, каталог `/opt/askwelhomebot/app`)
 
-**PowerShell (Windows):**
+```bash
+sudo -u askwelhomebot -H bash -lc 'cd /opt/askwelhomebot/app && git pull'
+sudo systemctl restart askwelhomebot.service
+```
+
+При необходимости после `git pull` установи зависимости от имени того же пользователя (если venv лежит в `app`):
+
+```bash
+sudo -u askwelhomebot -H bash -lc 'cd /opt/askwelhomebot/app && source .venv/bin/activate && pip install -r requirements.txt'
+```
+
+---
+
+**PowerShell (локально, Windows):**
 
 ```powershell
 cd "C:\path\to\agrealty-bot2"
@@ -27,21 +41,14 @@ pip install -r requirements.txt
 # перезапустите процесс бота (закройте окно / перезапустите задачу планировщика / службу)
 ```
 
-**Bash (Linux, VPS):**
+**Bash (другой Linux / без systemd — шаблон, путь свой):**
 
 ```bash
-cd /path/to/agrealty-bot2
-git fetch origin
+cd /path/to/repo
 git pull origin main
-source .venv/bin/activate   # если используете venv
+source .venv/bin/activate
 pip install -r requirements.txt
-# sudo systemctl restart your-bot-service   # при необходимости
+# перезапуск процесса вручную
 ```
 
-Одной строкой (Linux, из каталога репозитория):
-
-```bash
-git pull origin main && pip install -r requirements.txt
-```
-
-После обновления всегда перезапустите процесс `python -m bot.main`, иначе работает старый код.
+После обновления без systemd перезапусти процесс `python -m bot.main`, иначе крутится старый код.
