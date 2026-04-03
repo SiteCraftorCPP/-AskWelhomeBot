@@ -68,13 +68,9 @@ async def cb_broadcast_start(callback: CallbackQuery, state: FSMContext) -> None
     await callback.answer()
     await state.set_state(BroadcastStates.waiting_message)
     await callback.message.answer(
-        "📢 <b>Рассылка</b>\n\n"
-        "Пришлите <b>одно</b> сообщение, которое получат все пользователи из базы "
-        "(те, кто хотя бы раз нажал /start): текст, фото с подписью, видео, документ, "
-        "стикер, голос и т.д.\n\n"
-        "Подтверждение — кнопками после превью.\n"
+        "📢 Рассылка\n\n"
+        "Пришлите одно сообщение, которое получат все пользователи\n\n"
         "Отмена: /cancel",
-        parse_mode="HTML",
     )
 
 

@@ -16,12 +16,7 @@ from bot.handlers.admin import (
     is_prompt_only_editor,
 )
 from bot.keyboards import get_admin_panel_kb
-from bot.onboarding_store import (
-    MAX_ONBOARDING_CHARS,
-    get_onboarding_text,
-    save_onboarding_text,
-    uses_default_onboarding,
-)
+from bot.onboarding_store import get_onboarding_text, save_onboarding_text
 from bot.prompt_store import can_edit_prompt
 from bot.utils import send_long
 
@@ -44,16 +39,6 @@ def _onboarding_kb() -> InlineKeyboardMarkup:
     )
 
 
-def _status_line() -> str:
-    src = "встроенный из кода (bot/texts.py)" if uses_default_onboarding() else "файл data/onboarding_text.txt"
-    text = get_onboarding_text()
-    return (
-        f"👋 <b>Приветствие /start</b>\n\n"
-        f"Источник: {src}\n"
-        f"Длина: {len(text)} символов (макс. {MAX_ONBOARDING_CHARS})\n"
-    )
-
-
 @router.callback_query(F.data == "admin:onboarding")
 async def cb_onboarding_menu(callback: CallbackQuery) -> None:
     if not is_admin(callback.from_user.id, callback.from_user.username):
@@ -61,9 +46,8 @@ async def cb_onboarding_menu(callback: CallbackQuery) -> None:
         return
     await callback.answer()
     await callback.message.edit_text(
-        _status_line() + "\nВыберите действие:",
+        "👋 Приветствие /start\n\nВыберите действие:",
         reply_markup=_onboarding_kb(),
-        parse_mode="HTML",
     )
 
 
@@ -97,10 +81,8 @@ async def cb_onboarding_edit(callback: CallbackQuery, state: FSMContext) -> None
     await callback.answer()
     await state.set_state(OnboardingAdminStates.waiting_text)
     await callback.message.answer(
-        f"✏️ Пришлите новый текст сообщением или файлом <code>.txt</code> (UTF-8).\n"
-        f"До {MAX_ONBOARDING_CHARS} символов.\n"
+        "✏️ Пришлите новый текст сообщением или файлом .txt\n\n"
         "Отмена: /cancel",
-        parse_mode="HTML",
     )
 
 

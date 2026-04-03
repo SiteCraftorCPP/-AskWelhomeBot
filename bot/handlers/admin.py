@@ -29,7 +29,7 @@ def admin_panel_opening_html(user_id: int, username: str | None) -> str:
         n, _ = get_stats()
         return (
             "🔐 <b>Админ-панель</b>\n\n"
-            f"👥 В базе пользователей (первый <code>/start</code>): <b>{n}</b>"
+            f"👥 Пользователей: <b>{n}</b>"
         )
     except Exception:
         return "🔐 <b>Админ-панель</b>"
