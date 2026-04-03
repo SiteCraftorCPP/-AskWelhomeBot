@@ -7,6 +7,7 @@ from aiogram.types import Message
 from bot.config import Config
 from bot.keyboards import get_admin_panel_kb
 from bot.prompt_store import can_edit_prompt
+from bot.users_registry import get_stats
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -18,6 +19,20 @@ def is_admin(user_id: int, username: str | None = None) -> bool:
     if username and username.lower() in Config.ADMIN_USERNAMES:
         return True
     return False
+
+
+def admin_panel_opening_html(user_id: int, username: str | None) -> str:
+    """Первая часть текста админ-панели (со счётчиком базы для полных админов)."""
+    if not is_admin(user_id, username):
+        return "🔐 <b>Админ-панель</b>"
+    try:
+        n, _ = get_stats()
+        return (
+            "🔐 <b>Админ-панель</b>\n\n"
+            f"👥 В базе пользователей (первый <code>/start</code>): <b>{n}</b>"
+        )
+    except Exception:
+        return "🔐 <b>Админ-панель</b>"
 
 
 def is_prompt_only_editor(user_id: int, username: str | None) -> bool:
@@ -32,11 +47,12 @@ async def handle_admin_panel(message: Message) -> None:
         return
 
     await message.answer(
-        "🔐 Админ-панель\n\nВыберите действие:",
+        admin_panel_opening_html(uid, un) + "\n\nВыберите действие:",
         reply_markup=get_admin_panel_kb(
             show_prompt=can_edit_prompt(uid, un),
             prompt_only=is_prompt_only_editor(uid, un),
-            show_users_stats=is_admin(uid, un),
+            show_full_admin_tools=is_admin(uid, un),
         ),
+        parse_mode="HTML",
     )
 

@@ -7,7 +7,7 @@ from aiogram.types import Message, FSInputFile
 from aiogram.fsm.context import FSMContext
 from bot.config import Config
 from bot.keyboards import get_main_menu_inline
-from bot.texts import ONBOARDING_TEXT
+from bot.onboarding_store import get_onboarding_text
 
 logger = logging.getLogger(__name__)
 router = Router()
@@ -45,7 +45,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
             logger.warning(f"Failed to send logo: {e}")
     
     # Send onboarding text
-    await message.answer(ONBOARDING_TEXT)
+    await message.answer(get_onboarding_text())
 
     # Send report PDF after greeting (path в Config уже абсолютный от корня проекта)
     if Config.REPORT_PDF_PATH and os.path.isfile(Config.REPORT_PDF_PATH):

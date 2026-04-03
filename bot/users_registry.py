@@ -85,6 +85,12 @@ def get_stats() -> tuple[int, list[dict[str, Any]]]:
     return len(items), items
 
 
+def get_all_user_ids() -> list[int]:
+    """Все user_id из реестра (первый /start)."""
+    _, items = get_stats()
+    return [int(row["user_id"]) for row in items if row.get("user_id") is not None]
+
+
 def build_export_tsv() -> str:
     """Полный список для .txt (табуляция, UTF-8)."""
     _, items = get_stats()

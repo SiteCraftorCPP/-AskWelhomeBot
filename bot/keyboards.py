@@ -139,9 +139,9 @@ def get_feedback_reasons_kb() -> InlineKeyboardMarkup:
 def get_admin_panel_kb(
     show_prompt: bool = False,
     prompt_only: bool = False,
-    show_users_stats: bool = False,
+    show_full_admin_tools: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Админ-панель: промпт; для полных админов — статистика пользователей."""
+    """Админ-панель: для полных админов — пользователи, рассылка, приветствие; опционально промпт."""
     if prompt_only:
         return InlineKeyboardMarkup(
             inline_keyboard=[
@@ -149,8 +149,10 @@ def get_admin_panel_kb(
             ]
         )
     buttons: list[list[InlineKeyboardButton]] = []
-    if show_users_stats:
+    if show_full_admin_tools:
         buttons.append([InlineKeyboardButton(text="📊 Пользователи", callback_data="admin:users")])
+        buttons.append([InlineKeyboardButton(text="📢 Рассылка", callback_data="admin:broadcast")])
+        buttons.append([InlineKeyboardButton(text="👋 Приветствие /start", callback_data="admin:onboarding")])
     if show_prompt:
         buttons.append([InlineKeyboardButton(text="🤖 Промпт GPT (CORE)", callback_data="admin:prompt")])
     if not buttons:

@@ -10,7 +10,7 @@ from aiogram import Router, F
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 
 from bot.config import Config
-from bot.handlers.admin import is_admin, is_prompt_only_editor
+from bot.handlers.admin import admin_panel_opening_html, is_admin, is_prompt_only_editor
 from bot.keyboards import get_admin_panel_kb
 from bot.prompt_store import can_edit_prompt
 from bot.users_registry import build_export_tsv, get_stats
@@ -172,10 +172,11 @@ async def cb_users_back(callback: CallbackQuery) -> None:
         return
     await callback.answer()
     await callback.message.edit_text(
-        "🔐 Админ-панель\n\nВыберите действие:",
+        admin_panel_opening_html(uid, un) + "\n\nВыберите действие:",
         reply_markup=get_admin_panel_kb(
             show_prompt=can_edit_prompt(uid, un),
             prompt_only=is_prompt_only_editor(uid, un),
-            show_users_stats=True,
+            show_full_admin_tools=True,
         ),
+        parse_mode="HTML",
     )

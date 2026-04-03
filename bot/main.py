@@ -8,7 +8,18 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, Update
 from aiogram import BaseMiddleware
 from bot.config import Config
-from bot.handlers import start, menu, free_text, feedback, specialist, admin, admin_users, prompt_admin
+from bot.handlers import (
+    start,
+    menu,
+    free_text,
+    feedback,
+    specialist,
+    admin,
+    admin_users,
+    admin_broadcast,
+    admin_onboarding,
+    prompt_admin,
+)
 
 # Configure logging
 logging.basicConfig(
@@ -65,6 +76,8 @@ async def main() -> None:
     dp.include_router(specialist.router)
     dp.include_router(admin.router)
     dp.include_router(admin_users.router)
+    dp.include_router(admin_broadcast.router)
+    dp.include_router(admin_onboarding.router)
     dp.include_router(prompt_admin.router)
     dp.include_router(free_text.router)
     
