@@ -2,6 +2,16 @@
 
 Telegram-бот Welhome (aiogram 3).
 
+Для нестабильных сетей/блокировок можно задать прокси в `.env`:
+
+```env
+TELEGRAM_PROXY=154.81.199.66:64181:hGtcCsrT:S1mhartf
+PROXYAPI_TIMEOUT_SECONDS=45
+OPENROUTER_TIMEOUT_SECONDS=45
+```
+
+Поддерживаются форматы `socks5://user:pass@host:port` и `host:port:user:pass`.
+
 ## Локальный запуск
 
 Сначала перейди в каталог с клоном репозитория, потом команды (нужен `.env` с `BOT_TOKEN` и ключами LLM):

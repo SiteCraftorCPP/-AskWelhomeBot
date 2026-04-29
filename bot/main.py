@@ -5,6 +5,7 @@ import sys
 from typing import Any, Awaitable, Callable, Dict
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.types import Message, Update
 from aiogram import BaseMiddleware
 from bot.config import Config
@@ -62,7 +63,8 @@ async def main() -> None:
         sys.exit(1)
     
     # Initialize bot and dispatcher
-    bot = Bot(token=Config.BOT_TOKEN)
+    session = AiohttpSession(proxy=Config.TELEGRAM_PROXY or None)
+    bot = Bot(token=Config.BOT_TOKEN, session=session)
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
     

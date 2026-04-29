@@ -1,12 +1,22 @@
 """LLM integration with ProxyAPI and OpenRouter."""
 import logging
 import asyncio
+import httpx
 from openai import AsyncOpenAI
 from openai import PermissionDeniedError, APIError
 from bot.config import Config
 from bot.errors import APITimeoutError, RateLimitError, InvalidInputError
 
 logger = logging.getLogger(__name__)
+
+
+def _build_openai_http_client(timeout_seconds: int) -> httpx.AsyncClient:
+    kwargs: dict = {
+        "timeout": httpx.Timeout(timeout=float(timeout_seconds)),
+    }
+    if Config.TELEGRAM_PROXY:
+        kwargs["proxy"] = Config.TELEGRAM_PROXY
+    return httpx.AsyncClient(**kwargs)
 
 # Initialize ProxyAPI client
 proxyapi_key_initial = Config.PROXYAPI_API_KEY.strip() if Config.PROXYAPI_API_KEY else ""
@@ -15,6 +25,8 @@ if proxyapi_key_initial:
     proxyapi_client = AsyncOpenAI(
         api_key=proxyapi_key_initial,
         base_url=Config.PROXYAPI_BASE_URL,
+        timeout=Config.PROXYAPI_TIMEOUT_SECONDS,
+        http_client=_build_openai_http_client(Config.PROXYAPI_TIMEOUT_SECONDS),
     )
     logger.info(f"ProxyAPI клиент инициализирован (модель: {Config.PROXYAPI_MODEL})")
 
@@ -26,6 +38,8 @@ if openrouter_key_initial:
     openrouter_client = AsyncOpenAI(
         api_key=openrouter_key_initial,
         base_url=Config.OPENROUTER_BASE_URL,
+        timeout=Config.OPENROUTER_TIMEOUT_SECONDS,
+        http_client=_build_openai_http_client(Config.OPENROUTER_TIMEOUT_SECONDS),
         default_headers={
             "HTTP-Referer": Config.OPENROUTER_SITE_URL,
             "X-Title": Config.OPENROUTER_APP_NAME,

@@ -1,6 +1,7 @@
 """Configuration loader from .env file."""
 import os
 from pathlib import Path
+from urllib.parse import quote
 from dotenv import load_dotenv
 
 # Get the project root directory (parent of bot/)
@@ -79,10 +80,32 @@ def _merge_admin_chat_ids(parsed: list[int], legacy_single: int) -> list[int]:
     return out
 
 
+def _normalize_proxy_url(raw_proxy: str) -> str:
+    """
+    Нормализует прокси в URL-вид.
+    Поддержка:
+    - socks5://user:pass@host:port
+    - http://user:pass@host:port
+    - host:port:user:pass
+    """
+    raw_proxy = (raw_proxy or "").strip()
+    if not raw_proxy:
+        return ""
+    if "://" in raw_proxy:
+        return raw_proxy
+
+    parts = raw_proxy.split(":")
+    if len(parts) == 4:
+        host, port, user, password = parts
+        return f"socks5://{quote(user, safe='')}:{quote(password, safe='')}@{host}:{port}"
+    return raw_proxy
+
+
 class Config:
     """Bot configuration."""
     
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
+    TELEGRAM_PROXY: str = _normalize_proxy_url(os.getenv("TELEGRAM_PROXY", ""))
     # Legacy: ADMIN_CHAT_ID раньше был одним числом.
     # Теперь поддерживаем и "id1,id2" прямо в ADMIN_CHAT_ID.
     _ADMIN_CHAT_ID_RAW: str = os.getenv("ADMIN_CHAT_ID", "")
@@ -120,6 +143,7 @@ class Config:
     PROXYAPI_BASE_URL: str = os.getenv("PROXYAPI_BASE_URL", "https://openai.api.proxyapi.ru/v1")
     PROXYAPI_MODEL: str = os.getenv("PROXYAPI_MODEL", "openai/gpt-5.1")
     PROXYAPI_MAX_TOKENS: int = _get_int("PROXYAPI_MAX_TOKENS", 4000)
+    PROXYAPI_TIMEOUT_SECONDS: int = _get_int("PROXYAPI_TIMEOUT_SECONDS", 45)
     
     # OpenRouter configuration (опционально, для отката)
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
@@ -128,6 +152,7 @@ class Config:
     OPENROUTER_SITE_URL: str = os.getenv("OPENROUTER_SITE_URL", "http://localhost")
     OPENROUTER_APP_NAME: str = os.getenv("OPENROUTER_APP_NAME", "Welhome Bot")
     OPENROUTER_MAX_TOKENS: int = _get_int("OPENROUTER_MAX_TOKENS", 1500)
+    OPENROUTER_TIMEOUT_SECONDS: int = _get_int("OPENROUTER_TIMEOUT_SECONDS", 45)
     
     # LLM Provider selection
     # Определение провайдера по умолчанию:
